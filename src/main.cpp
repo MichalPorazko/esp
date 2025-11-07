@@ -14,16 +14,21 @@
 #include "esp_system.h"
 #include "mqtt_client.h"
 #include "nvs_flash.h"
+#include "esp_tls.h"
 
 
 
-#define WIFI_SSID      "xx"
+#define WIFI_SSID      "xxx"
 #define WIFI_PASS      "xxx"
-#define MQTT_TOPIC  "esp32/telemetry"
+#define MQTT_TOPIC  "xxx"
 #define MQTT_BROKER_URI "xxx" 
 #define MQTT_PORT 8883
 #define MQTT_USERNAME "xxx"
 #define MQTT_PASSWORD "xxx"
+
+
+extern const uint8_t hivemq_ca_pem_start[] asm("_binary_isrgrootx1_pem_start");
+extern const uint8_t hivemq_ca_pem_end[]   asm("_binary_isrgrootx1_pem_end");
 
 static const char *TAG = "esp";
 
@@ -42,13 +47,14 @@ static const char *TAG = "esp";
 static EventGroupHandle_t s_wifi_event_group;
 static EventGroupHandle_t s_mqtt_event_group;
 
+
 static esp_mqtt_client_handle_t s_mqtt_client = nullptr;
 
 
 static constexpr EventBits_t WIFI_CONNECTED_BIT = BIT0;
-
-
 static constexpr EventBits_t MQTT_CONNECTED_BIT = BIT0;
+
+
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
@@ -63,7 +69,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
 
-        //this static cast watch out
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) (event_data);
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
@@ -85,19 +90,23 @@ static void wifi_init_sta() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
 
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, nullptr, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, nullptr, &instance_got_ip));
 
+
     wifi_config_t wifi_config{};
     std::strncpy(reinterpret_cast<char *>(wifi_config.sta.ssid), WIFI_SSID,
                  sizeof(wifi_config.sta.ssid));
     std::strncpy(reinterpret_cast<char *>(wifi_config.sta.password), WIFI_PASS,
                  sizeof(wifi_config.sta.password));
+
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -183,6 +192,8 @@ static void mqtt_start() {
     mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
     mqtt_cfg.credentials.username = MQTT_USERNAME;
     mqtt_cfg.broker.address.port = MQTT_PORT;
+    mqtt_cfg.broker.verification.certificate = (const char*)hivemq_ca_pem_start;
+    mqtt_cfg.broker.verification.certificate_len = hivemq_ca_pem_end - hivemq_ca_pem_start;
 
     
 
