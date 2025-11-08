@@ -1,3 +1,6 @@
-.pio
+.pio/
 .vscode/
 src/certs/
+sdkconfig
+sdkconfig.esp32dev
+build
