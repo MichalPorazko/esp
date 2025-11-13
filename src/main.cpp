@@ -27,15 +27,14 @@ extern "C" void app_main(void) {
 
     wifi_init_sta();
     uart_init();
-    
-    xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE,
-                        portMAX_DELAY);
 
     mqtt_start();
 
-    xTaskCreate(&uart_rx_task, "uart_rx_task", 4096, nullptr, 5, nullptr);    
+    xTaskCreatePinnedToCore(&uart_rx_task, "uart_rx_task", 4096, nullptr, 5, nullptr, 0);    
 
     config_sleep_mode();
+
+    put_into_light_sleep_mode();
 }
 
 

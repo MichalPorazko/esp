@@ -33,9 +33,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI("esp", "MQTT_EVENT_SUBSCRIBED, msg_id=%d, return code=0x%02x ", event->msg_id, (uint8_t)*event->data);
-            //send here the payload if its possible (publish empty payload)
-            msg_id = esp_mqtt_client_publish(client, MQTT_TOPIC, nullptr, 0, 0, 0);
-            ESP_LOGI("esp", "sent publish successful, msg_id=%d", msg_id);
             break;
 
         case MQTT_EVENT_UNSUBSCRIBED:
@@ -43,6 +40,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             break;
 
         case MQTT_EVENT_PUBLISHED:
+            xEventGroupSetBits(s_mqtt_event_group, MQTT_PUBLISHED_BIT);
             ESP_LOGI("esp", "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
             break;
 
@@ -92,11 +90,6 @@ void mqtt_init() {
     mqtt_cfg.broker.verification.certificate = (const char*)hivemq_ca_pem_start;
     mqtt_cfg.broker.verification.certificate_len = hivemq_ca_pem_end - hivemq_ca_pem_start;
 
-}
-
-static void mqtt_start() {
-
-
     // Initialize the MQTT client with the configuration and event handler
     s_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     if (s_mqtt_client == NULL) {
@@ -104,6 +97,13 @@ static void mqtt_start() {
         return;
     }
 
+
+}
+
+void mqtt_start() {
+
+
+    
     esp_mqtt_client_register_event(s_mqtt_client, MQTT_EVENT_CONNECTED, mqtt_event_handler, NULL);
 
     

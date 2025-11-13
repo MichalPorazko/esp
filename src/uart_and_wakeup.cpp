@@ -1,10 +1,13 @@
 
 #include "uart_and_wakeup.h"
 #include "mqtt.h"
+#include "wifi.h"
 
 static const char *TAG_WAKEUP = "uart_wakeup";
 
 static QueueHandle_t uart_evt_que = NULL;
+
+
 
 void uart_init() {
     uart_config_t uart_config = {};
@@ -15,17 +18,20 @@ void uart_init() {
     uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
     uart_config.source_clk = UART_SCLK_APB;
 
+
     ESP_ERROR_CHECK(uart_driver_install(UART_PORT, UART_BUFFER_SIZE * 2, 0, 0, nullptr, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_PORT, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_PORT, UART_TX_PIN, UART_RX_PIN,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_set_rx_full_threshold(UART_PORT, UART_RX_FULL_THRESH));                 
 
+    
     ESP_LOGI("esp", "UART initialized (port=%d, baud=%d)", UART_PORT, UART_BAUD_RATE);
 }
 
 
-
 void uart_rx_task(void *param) {
+
     
     auto *buffer = static_cast<uint8_t *>(pvPortMalloc(UART_BUFFER_SIZE));
     if (buffer == nullptr) {
@@ -49,14 +55,12 @@ void uart_rx_task(void *param) {
             switch(event.type) {
                 case UART_DATA:
                     
-                ESP_LOGI("esp", "[UART DATA]: %d", event.size);
-                uart_read_bytes(UART_PORT, buffer, event.size, portMAX_DELAY);
-                                        
-                xEventGroupWaitBits(s_mqtt_event_group, MQTT_CONNECTED_BIT, pdFALSE, pdFALSE,
-                                       portMAX_DELAY);
-                send_mqtt_data(buffer, event.size);
-                
-                break;        
+                    ESP_LOGI("esp", "[UART DATA]: %d", event.size);
+                    uart_read_bytes(UART_PORT, buffer, event.size, portMAX_DELAY);
+
+                    xQueueSend(uart_evt_que, buffer, portMAX_DELAY);
+                    
+                    break;        
 
                 // Event of HW FIFO overflow detected
                 case UART_FIFO_OVF:
@@ -100,8 +104,7 @@ void uart_rx_task(void *param) {
             }
         }
     }
-    // free(buffer); ????
-    // vTaskDelete(NULL);  ????
+    free(buffer); 
 
 }
 
@@ -118,26 +121,8 @@ esp_err_t config_sleep_mode(void){
     // Configure GPIO wakeup
     ESP_LOGI(TAG_WAKEUP, "Enabling GPIO wakeup on UART ");
 
-    
-
-    /* UART will wakeup the chip up from light sleep if the edges that RX pin received has reached the threshold
-     * Besides, the Rx pin need extra configuration to enable it can work during light sleep */
-
-    
-    /*
-        GPIO set direction at sleep
- 
-        Configure GPIO direction,such as output_only,input_only,output_and_input
-    */ 
     ESP_RETURN_ON_ERROR(gpio_sleep_set_direction(UART_RX_PIN, GPIO_MODE_INPUT), TAG_WAKEUP, "Set uart sleep gpio failed");
     
-    
-    /*
-        Configure GPIO pull-up/pull-down resistors at sleep
-    
-        @note ESP32: Only pins that support both input & output have integrated pull-up and pull-down resistors. 
-        Input-only GPIOs 34-39 do not.
-    */
     ESP_RETURN_ON_ERROR(gpio_sleep_set_pull_mode(UART_RX_PIN, GPIO_PULLUP_ONLY), TAG_WAKEUP, "Set uart sleep gpio failed");
     
     
@@ -149,31 +134,17 @@ esp_err_t config_sleep_mode(void){
     return ESP_OK;
 
 
-    ESP_LOGI(TAG_WAKEUP, "Entering deep sleep now...");
+}
+
+
+void put_into_light_sleep_mode(void){
+
+    ESP_LOGI("uart_wakeup", "Entering deep sleep now...");
     // Add a small delay to ensure log message is printed before sleep
     vTaskDelay(pdMS_TO_TICKS(200));
 
     // --- Enter Deep Sleep ---
-    esp_light_sleep_start(); // This function does not return
-
+    esp_light_sleep_start(); 
 }
 
-void wake_up_callback(void) {
-    
-    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
-    if (cause != ESP_SLEEP_WAKEUP_UNDEFINED) { // Skip first boot
-        ESP_LOGI(TAG_WAKEUP, "Wakeup cause: %d", cause);
-
-        if (cause == ESP_SLEEP_WAKEUP_UART) {
-        
-            ESP_LOGI(TAG_WAKEUP, "Woken up by GPIO.");
-            
-        } else {
-            ESP_LOGI(TAG_WAKEUP, "Woken up by other source: %d", cause);
-        }
-    } else {
-        ESP_LOGI(TAG_WAKEUP, "First boot or not woken from deep sleep.");
-    }
-    
-}
 

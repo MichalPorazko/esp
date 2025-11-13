@@ -4,8 +4,6 @@
 
 #include "esp_err.h"
 
-#include "driver/gpio.h"
-#include "driver/uart.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -21,11 +19,14 @@
 #define WIFI_SSID      "xxx"
 #define WIFI_PASS      "xxx"
 
+extern TaskHandle_t wifi_task_handle;
+extern EventGroupHandle_t s_wifi_event_group;
+extern esp_event_handler_instance_t instance_any_id;
+extern esp_event_handler_instance_t instance_got_ip;
 
-EventGroupHandle_t s_wifi_event_group;
+EventBits_t WIFI_CONNECTED_BIT;
 
 void wifi_init_sta(void);
 
 
-esp_event_handler_instance_t instance_any_id;
-esp_event_handler_instance_t instance_got_ip;
+
