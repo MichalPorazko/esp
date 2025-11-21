@@ -16,17 +16,10 @@
 #include "esp_tls.h"
 #include "esp_check.h"
 
-#define WIFI_SSID      "xxx"
-#define WIFI_PASS      "xxx"
-
-extern TaskHandle_t wifi_task_handle;
-extern EventGroupHandle_t s_wifi_event_group;
-extern esp_event_handler_instance_t instance_any_id;
-extern esp_event_handler_instance_t instance_got_ip;
-
-EventBits_t WIFI_CONNECTED_BIT;
 
 void wifi_init_sta(void);
+void wifi_start(void* args);
+void wifi_stop(void);
 
 
 

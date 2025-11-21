@@ -10,7 +10,8 @@
 
 #include "wifi.h"
 #include "mqtt.h"
-#include "uart_and_wakeup.h"      
+#include "uart_and_wakeup.h"  
+#include "task_handles.h"    
 
 
 
@@ -22,15 +23,17 @@ extern "C" void app_main(void) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }
-    
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    wifi_init_sta();
+    buffer = static_cast<uint8_t *>(pvPortMalloc(UART_BUFFER_SIZE));
+
     uart_init();
+    wifi_init_sta();
+    mqtt_init();
+    
 
-    mqtt_start();
-
-    xTaskCreatePinnedToCore(&uart_rx_task, "uart_rx_task", 4096, nullptr, 5, nullptr, 0);    
+    xTaskCreatePinnedToCore(uart_start, "uart_start", 2048, nullptr, UART_TASK_PRIORITY, &uart_task_handle, CORE_0); 
+    xTaskCreatePinnedToCore(wifi_start, "wifi_start", 4096, nullptr, WIFI_TASK_PRIORITY, &wifi_task_handle, CORE_1); 
+    xTaskCreatePinnedToCore(mqtt_start, "mqtt_start", 4096, nullptr, MQTT_TASK_PRIORITY, &mqtt_task_handle, CORE_1);    
 
     config_sleep_mode();
 

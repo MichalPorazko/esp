@@ -19,6 +19,8 @@
 #include "esp_pm.h"     
 
 
+
+
 #define UART_PORT           UART_NUM_1
 #define UART_TX_PIN         GPIO_NUM_17
 #define UART_RX_PIN         GPIO_NUM_16
@@ -26,16 +28,19 @@
 #define UART_BUFFER_SIZE    48
 #define UART_WAKEUP_TRESHOLD     3  
 #define UART_RX_FULL_THRESH        48
+#define CONFIG_MAX_CPU_FREQ_MHZ 200
+#define CONFIG_MIN_CPU_FREQ_MHZ 60
 
 
-TaskHandle_t s_uart_rx_task_handle;
 
 
-void uart_rx_task(void *param);
-void uart_init();
+void uart_init(void);
+void uart_start(void* args);
 
 esp_err_t config_sleep_mode(void);
 
 void put_into_light_sleep_mode(void);
+
+
 
 

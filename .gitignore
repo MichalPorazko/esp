@@ -4,3 +4,4 @@ src/certs/
 sdkconfig
 sdkconfig.esp32dev
 build
+include/secrets/secrets.h

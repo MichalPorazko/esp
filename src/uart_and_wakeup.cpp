@@ -2,14 +2,17 @@
 #include "uart_and_wakeup.h"
 #include "mqtt.h"
 #include "wifi.h"
+#include "task_handles.h"
 
 static const char *TAG_WAKEUP = "uart_wakeup";
 
 static QueueHandle_t uart_evt_que = NULL;
 
+ esp_event_loop_handle_t uart_loop_handle;
+ esp_event_loop_args_t uart_loop_args = {};
 
 
-void uart_init() {
+void uart_init(void) {
     uart_config_t uart_config = {};
     uart_config.baud_rate = UART_BAUD_RATE;
     uart_config.data_bits = UART_DATA_8_BITS;
@@ -19,7 +22,7 @@ void uart_init() {
     uart_config.source_clk = UART_SCLK_APB;
 
 
-    ESP_ERROR_CHECK(uart_driver_install(UART_PORT, UART_BUFFER_SIZE * 2, 0, 0, nullptr, 0));
+    ESP_ERROR_CHECK(uart_driver_install(UART_PORT, UART_BUFFER_SIZE, 0, QUEUE_SIZE, &uart_evt_que, 0));
     ESP_ERROR_CHECK(uart_param_config(UART_PORT, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_PORT, UART_TX_PIN, UART_RX_PIN,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
@@ -30,93 +33,58 @@ void uart_init() {
 }
 
 
-void uart_rx_task(void *param) {
+static void uart_data_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
+        
+    ESP_LOGI("esp", "[UART DATA]: %d", );
+    xQueueReceive(uart_evt_que, (void *)buffer, portMAX_DELAY);
 
-    
-    auto *buffer = static_cast<uint8_t *>(pvPortMalloc(UART_BUFFER_SIZE));
-    if (buffer == nullptr) {
-        ESP_LOGE("esp", "Failed to allocate UART buffer");
-        vTaskDelete(nullptr);
-        return;
-    }
 
-    uart_event_t event;
-    if (uart_evt_que == NULL) {
-        ESP_LOGE("esp", "uart_evt_que is NULL");
-        abort();
-    }
+}
 
-    while(1) {
-        // Waiting for UART event.
-        if(xQueueReceive(uart_evt_que, (void * )&event, (TickType_t)portMAX_DELAY)) {
-            
-            ESP_LOGI("esp", "uart%d recved event:%d", UART_PORT, event.type);
+static void uart_buffer_overflow_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
 
-            switch(event.type) {
-                case UART_DATA:
-                    
-                    ESP_LOGI("esp", "[UART DATA]: %d", event.size);
-                    uart_read_bytes(UART_PORT, buffer, event.size, portMAX_DELAY);
 
-                    xQueueSend(uart_evt_que, buffer, portMAX_DELAY);
-                    
-                    break;        
+    ESP_LOGI("esp", "ring buffer full");
+    vTaskResume(uart_task_handle);
+}
 
-                // Event of HW FIFO overflow detected
-                case UART_FIFO_OVF:
-                    ESP_LOGI("esp", "hw fifo overflow");
+static void uart_fifo_overflow_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data){
+
+
+    ESP_LOGI("esp", "hw fifo overflow");
                     // If fifo overflow happened, you should consider adding flow control for your application.
                     // The ISR has already reset the rx FIFO,
                     // As an example, we directly flush the rx buffer here in order to read more data.
-                    uart_flush_input(UART_PORT);
-                    xQueueReset(uart_evt_que);
-                    break;
-                // Event of UART ring buffer full
-                case UART_BUFFER_FULL:
-                    ESP_LOGI("esp", "ring buffer full");
-                    // If buffer full happened, you should consider encreasing your buffer size
-                    // As an example, we directly flush the rx buffer here in order to read more data.
-                    uart_flush_input(UART_PORT);
-                    xQueueReset(uart_evt_que);
-                    break;
-                // Event of UART RX break detected
-                case UART_BREAK:
-                    ESP_LOGI("esp", "uart rx break");
-                    break;
-                // Event of UART parity check error
-                case UART_PARITY_ERR:
-                    ESP_LOGI("esp", "uart parity error");
-                    break;
-                // Event of UART frame error
-                case UART_FRAME_ERR:
-                    ESP_LOGI("esp", "uart frame error");
-                    break;
-                // ESP32 can wakeup by uart but there is no wake up interrupt
-#if SOC_UART_SUPPORT_WAKEUP_INT
-                // Event of waking up by UART
-                case UART_WAKEUP:
-                    ESP_LOGI(TAG, "uart wakeup");
-                    break;
-#endif
-                default:
-                    ESP_LOGI("esp", "uart event type: %d", event.type);
-                    break;
-            }
-        }
-    }
+    uart_flush_input(UART_PORT);
+    xQueueReset(uart_evt_que);
     free(buffer); 
+}
 
+void uart_start(void* args) {
+
+
+    uart_loop_args.queue_size = QUEUE_SIZE;
+    uart_loop_args.task_name = "uart_start";
+    uart_loop_args.task_priority = uxTaskPriorityGet(NULL);
+    uart_loop_args.task_stack_size = 4 * 1024;
+    uart_loop_args.task_core_id = CORE_0;
+
+    esp_event_loop_create(&uart_loop_args, &uart_loop_handle);
+
+    esp_event_handler_instance_register_with(uart_loop_handle, ESP_EVENT_ANY_BASE, UART_DATA, uart_data_handler, NULL, NULL);
+    esp_event_handler_instance_register_with(uart_loop_handle, ESP_EVENT_ANY_BASE, UART_BUFFER_FULL, uart_buffer_overflow_handler, NULL, NULL);
+    esp_event_handler_instance_register_with(uart_loop_handle, ESP_EVENT_ANY_BASE, UART_FIFO_OVF, uart_fifo_overflow_handler, NULL, NULL);
 }
 
 
 esp_err_t config_sleep_mode(void){
     
-    // esp_pm_config_t pm_config = {
-    //     .max_freq_mhz = CONFIG_EXAMPLE_MAX_CPU_FREQ_MHZ, // e.g., 160, 240
-    //     .min_freq_mhz = CONFIG_EXAMPLE_MIN_CPU_FREQ_MHZ, // e.g., 10, 40, 80
-    //     .light_sleep_enable = true // Enable automatic light sleep
-    // };
-    // esp_err_t err = esp_pm_configure(&pm_config);
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = CONFIG_MAX_CPU_FREQ_MHZ, // e.g., 160, 240
+        .min_freq_mhz = CONFIG_MIN_CPU_FREQ_MHZ, // e.g., 10, 40, 80
+        .light_sleep_enable = true // Enable automatic light sleep
+    };
+    esp_pm_configure(&pm_config);
 
     // Configure GPIO wakeup
     ESP_LOGI(TAG_WAKEUP, "Enabling GPIO wakeup on UART ");
