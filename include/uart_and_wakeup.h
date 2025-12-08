@@ -35,7 +35,7 @@
 
 
 void uart_init(void);
-void uart_start(void* args);
+void uart_rx_task(void* args);
 
 esp_err_t config_sleep_mode(void);
 

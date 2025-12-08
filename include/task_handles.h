@@ -1,11 +1,13 @@
 #pragma once
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 extern TaskHandle_t uart_task_handle;
 extern TaskHandle_t wifi_task_handle;
 extern TaskHandle_t mqtt_task_handle;
 
-uint8_t *buffer;
+extern uint8_t buffer[48];
 
 #define MQTT_TASK_PRIORITY    6
 #define WIFI_TASK_PRIORITY    5
