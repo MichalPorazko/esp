@@ -64,6 +64,7 @@ void uart_rx_task(void* args) {
                     buffer_pos += len;
 
                     if (buffer_pos >= UART_RX_FULL_THRESH) {
+                        ESP_LOGI("uart", "Received all data, reasuming the Wifi Task");
                         buffer_pos = 0;
                         vTaskResume(wifi_task_handle);
                     }

@@ -15,6 +15,13 @@ static void send_mqtt_data(const uint8_t *data, size_t length) {
         return;
     }
 
+
+    ESP_LOGI("mqtt", "Sending data");
+        for (int i=0;i < (sizeof (*data)/sizeof (data[0]));i++) {
+            printf(" %d ",data[i]);
+    }
+
+
     int msg_id = esp_mqtt_client_publish(s_mqtt_client, MQTT_TOPIC,
                                          reinterpret_cast<const char *>(data),
                                          static_cast<int>(length), 1, 0);
@@ -62,20 +69,19 @@ void mqtt_event_published_handler(void *handler_args, esp_event_base_t base, int
 void mqtt_init(void) {
     
 
-    mqtt_cfg.broker.address.uri = MQTT_BROKER_URI;
-    //mqtt_cfg.broker.address.port = MQTT_PORT;
-    //mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_SSL;
-    //mqtt_cfg.broker.address.hostname = MQTT_HOST;
+ //   mqtt_cfg.broker.address.uri = MQTT_BROKER_URI;
+    mqtt_cfg.broker.address.port = MQTT_PORT;
+    mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_SSL;
+    mqtt_cfg.broker.address.hostname = MQTT_BROKER_URI;
     
-    mqtt_cfg.credentials.client_id = "esp32_client_001";
     
-    //mqtt_cfg.broker.address.port = MQTT_PORT;
-    mqtt_cfg.broker.verification.certificate = (const char*)hivemq_ca_pem_start;
+    mqtt_cfg.broker.address.port = MQTT_PORT;
+    mqtt_cfg.broker.verification.certificate = (const char*)root_ca_pem_start;
 
     mqtt_cfg.credentials.authentication.certificate = (const char*)client_crt_pem_start;
     mqtt_cfg.credentials.authentication.key = (const char*)client_key_pem_start;
-    mqtt_cfg.credentials.username = MQTT_USERNAME;
-    mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
+    // mqtt_cfg.credentials.username = MQTT_USERNAME;
+    // mqtt_cfg.credentials.authentication.password = MQTT_PASSWORD;
 
 
     ESP_LOGI("mqtt", "MQTT configuration initialized.");

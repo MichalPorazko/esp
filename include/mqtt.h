@@ -11,9 +11,9 @@
 
 
 
-extern const uint8_t hivemq_ca_pem_start[] asm("_binary_isrgrootx1_pem_start");
-extern const uint8_t client_crt_pem_start[]     asm("_binary_client_pem_start");
-extern const uint8_t client_key_pem_start[]     asm("_binary_client_key_start");
+extern const uint8_t root_ca_pem_start[] asm("_binary_AmazonRootCA1_pem_start");
+extern const uint8_t client_crt_pem_start[]     asm("_binary_Device_certificate_crt_start");
+extern const uint8_t client_key_pem_start[]     asm("_binary_Private_key_key_start");
 
 
 
