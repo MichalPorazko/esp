@@ -48,11 +48,13 @@ extern "C" void app_main(void) {
     xTaskCreatePinnedToCore(mqtt_start, "mqtt_start", 4096, nullptr, MQTT_TASK_PRIORITY, &mqtt_task_handle, CORE_1); 
     ESP_LOGI("MAIN", "MQTT task created");   
 
+    /*
     config_sleep_mode();
     ESP_LOGI("MAIN", "Configured light sleep mode");
 
     put_into_light_sleep_mode();
     ESP_LOGI("MAIN", "Device is now in light sleep mode");
+    */
 }
 
 

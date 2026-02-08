@@ -21,9 +21,9 @@
 
 
 
-#define UART_PORT           UART_NUM_1
-#define UART_TX_PIN         GPIO_NUM_17
-#define UART_RX_PIN         GPIO_NUM_16
+#define UART_PORT           UART_NUM_0
+#define UART_TX_PIN         GPIO_NUM_1
+#define UART_RX_PIN         GPIO_NUM_3
 #define UART_BAUD_RATE      115200
 #define UART_BUFFER_SIZE    48
 #define UART_WAKEUP_TRESHOLD     3  
